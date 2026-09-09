@@ -2,6 +2,8 @@ import os
 import sys
 import math
 import datetime
+import urllib.parse
+import requests
 import pytz
 import yaml
 
@@ -75,22 +77,22 @@ def get_current_time_in_timezone(location_or_timezone: str) -> str:
 
 @tool
 def get_weather(location: str) -> str:
-    """查询指定城市的实时天气情况与气温信息。
+    """查询全球任意城市或地区的实时天气与气温信息。
     Args:
-        location: 城市名称 (例如 'Beijing', 'Paris', 'London', 'Shenyang')。
+        location: 城市或国家/地区名称 (例如 'Beijing', 'Paris', 'Botswana', '博茨瓦纳', '沈阳')。
     """
-    mock_weather = {
-        "beijing": "晴空万里，微风，气温 23°C，体感舒适",
-        "shanghai": "多云转晴，气温 25°C，湿度 60%",
-        "shenyang": "晴，秋高气爽，气温 15°C - 24°C",
-        "paris": "晴朗，气温 20°C，湿度 45%，微风",
-        "london": "多云，偶有零星小雨，气温 16°C",
-        "new york": "阴天，气温 18°C，西北风 3级",
-        "tokyo": "晴天，气温 22°C，紫外线中等",
-    }
-    key = location.lower().strip()
-    report = mock_weather.get(key, f"天气良好，晴间多云，气温约 20°C")
-    return f"{location} 当前天气: {report}"
+    loc = location.strip()
+    try:
+        # 调用全球免密实时天气服务 wttr.in (使用 %l: %C %t 格式获取纯文本，避免 emoji 编码异常)
+        url_loc = urllib.parse.quote(loc)
+        resp = requests.get(f"https://wttr.in/{url_loc}?m&format=%l:+%C+%t", timeout=6)
+        if resp.status_code == 200 and "Unknown location" not in resp.text and not resp.text.strip().startswith("<"):
+            return f"【实时气象数据】{resp.text.strip()}"
+    except Exception:
+        pass
+    
+    # 明确告知智能体未查到，引导智能体通过 web_search 联网查阅，绝不捏造假默认值
+    return f"未能直接从气象API获取到「{loc}」的天气。请调用 web_search 工具搜索「{loc} 当前天气」以获取最新真实天气！"
 
 @tool
 def calculator(expression: str) -> str:
