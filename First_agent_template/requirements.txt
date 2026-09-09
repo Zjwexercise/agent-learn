@@ -1,0 +1,10 @@
+﻿smolagents>=1.26.0
+gradio>=5.0.0
+markdownify
+requests
+duckduckgo-search
+ddgs
+pytz
+python-dotenv
+openai
+pandas
