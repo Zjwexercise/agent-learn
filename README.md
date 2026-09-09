@@ -117,21 +117,22 @@ agent-learn/
 ├── .env.example               # 环境变量配置模板
 ├── .gitignore                 # Git 忽略配置规则 (严格保护 .env 和 .venv)
 ├── README.md                  # 学习日志与项目索引
-├── chapter1/                  # 第一章：底层原理白盒学习
-│   └── DummyAgentLibrary.py   # 手写 ReAct 机制完整对比实验
-└── First_agent_template/      # 官方标准课程智能体 (Space 完整复刻与拓展)
-    ├── .gitattributes         # 官方 Git LFS 配置
-    ├── agent.json             # 智能体元数据描述
-    ├── app.py                 # 主程序入口 (支持 Gradio Web UI 与 --cli 模式)
-    ├── Gradio_UI.py           # 官方可视化 Web 前端交互组件
-    ├── prompts.yaml           # 现代 Jinja 提示词模版
-    ├── requirements.txt       # 项目依赖清单
-    ├── README.md              # Space 独立说明文档
-    └── tools/                 # 核心工具包
-        ├── __init__.py
-        ├── final_answer.py    # 终结工具
-        ├── web_search.py      # 网页搜索工具
-        └── visit_webpage.py   # 网页抓取与阅读工具
+└── chapter1/                  # 第一章：Unit 1 完整学习目录
+    ├── dummy_agent/           # 模块一：手搓基础智能体 (Dummy Agent)
+    │   └── DummyAgentLibrary.py   # 单文件独立实现：ReAct 机制完整对比实验
+    └── First_agent_template/  # 模块二：官方课程智能体 (Space 完整复刻与拓展)
+        ├── .gitattributes     # 官方 Git LFS 配置
+        ├── agent.json         # 智能体元数据描述
+        ├── app.py             # 主程序入口 (支持 Gradio Web UI 与 --cli 模式)
+        ├── Gradio_UI.py       # 官方可视化 Web 前端交互组件
+        ├── prompts.yaml       # 现代 Jinja 提示词模版
+        ├── requirements.txt   # 项目依赖清单
+        ├── README.md          # Space 独立说明文档
+        └── tools/             # 核心工具包
+            ├── __init__.py
+            ├── final_answer.py    # 终结工具
+            ├── web_search.py      # 网页搜索工具
+            └── visit_webpage.py   # 网页抓取与阅读工具
 ```
 
 ---
@@ -142,7 +143,7 @@ agent-learn/
    ```bash
    python -m venv .venv
    .\.venv\Scripts\Activate.ps1
-   pip install -r First_agent_template/requirements.txt
+   pip install -r chapter1/First_agent_template/requirements.txt
    ```
 2. **配置密钥**：
    在项目根目录 `.env` 中填入你的智谱 API Key：
@@ -150,15 +151,15 @@ agent-learn/
    ZHIPUAI_API_KEY="your_api_key_here"
    ```
 3. **运行测试**：
-   - **第一章 手搓 ReAct 基础智能体**：
+   - **模块一：手搓 ReAct 基础智能体 (单文件)**：
      ```bash
-     python .\chapter1\DummyAgentLibrary.py
+     python .\chapter1\dummy_agent\DummyAgentLibrary.py
      ```
-   - **进阶实战 1：命令行秒级自测**：
+   - **模块二：官方模板智能体（命令行秒级自测）**：
      ```bash
-     python .\First_agent_template\app.py --cli
+     python .\chapter1\First_agent_template\app.py --cli
      ```
-   - **进阶实战 2：启动浏览器图形化交互 Web UI**：
+   - **模块二：官方模板智能体（启动浏览器图形化 Web UI）**：
      ```bash
-     python .\First_agent_template\app.py
+     python .\chapter1\First_agent_template\app.py
      ```

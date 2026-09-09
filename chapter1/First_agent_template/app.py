@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import math
 import datetime
@@ -16,7 +16,7 @@ if sys.platform == "win32":
     except AttributeError:
         pass
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from smolagents import CodeAgent, OpenAIServerModel, tool
 from tools.final_answer import FinalAnswerTool
 from tools.web_search import DuckDuckGoSearchTool
@@ -26,7 +26,7 @@ from Gradio_UI import GradioUI
 # -------------------------------------------------------------
 # 1. 加载配置与模型初始化 (安全读取 .env，不泄露密钥)
 # -------------------------------------------------------------
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+load_dotenv(find_dotenv())
 api_key = os.environ.get("ZHIPUAI_API_KEY")
 
 if not api_key:
