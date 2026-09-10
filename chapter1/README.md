@@ -1,8 +1,9 @@
 # 📖 Unit 1: 智能体基础与初识工具 (Dummy Agent & First Agent Template)
 
-本目录为 Hugging Face 官方课程 **Unit 1** 的全部实践与原理解析，包含两个逐步递进的模块：
+本目录为 Hugging Face 官方课程 **Unit 1** 的全部实践与原理解析，包含三个逐步递进的模块：
 1. **`dummy_agent/`**：手搓白盒 ReAct 智能体（理解 Stop 截断、思维链与工具闭环）；
-2. **`First_agent_template/`**：工业级框架 `smolagents` 官方模板克隆、修复与 7 大工具拓展实战。
+2. **`First_agent_template/`**：工业级框架 `smolagents` 官方模板克隆、修复与 7 大工具拓展实战；
+3. **`test.py` (本地开源模型进阶)**：本地 Ollama 小模型落地、硬件内存压榨调优与 CodeAgent vs ToolCallingAgent 范式深度对比。
 
 ---
 
@@ -95,13 +96,97 @@ flowchart LR
 
 ---
 
+---
+
+## 模块三：本地开源模型落地与智能体范式对比 (Ollama + Smolagents)
+
+* **核心实战脚本**：[`test.py`](../test.py)
+
+### 1. 为什么探索本地开源模型？
+在调用商业云端大模型（如智谱 GLM）进行开放式公网新闻搜索时，商业平台往往设有**严格的安全审查与敏感词拦截**，导致 Agent 任务频频被拒。引入本地 Ollama 开源模型（如阿里 `qwen2.5-coder:1.5b`）带来了三大不可替代的价值：
+- 🔒 **100% 本地隐私与零数据外泄**：一切输入与输出均在本地计算。
+- 🛡️ **自由探索与免审查阻断**：适合无限制地执行开放网络信息检索。
+- ⚡ **离线/断网可用**：无需外部 API 余额，本地算力即可驱动智能体闭环。
+
+---
+
+### 2. 深度排错记录与避坑实践
+
+#### 坑 1：Ollama 500 崩溃 (`failed to allocate compute pp buffers`)
+- **异常现象**：调用本地 1.5B 模型时抛出异常：
+  ```text
+  Error code: 500 - {'error': {'message': 'llama runner process has terminated: 
+  llama_init_from_model: failed to initialize the context: failed to allocate compute pp buffers\npanic:'}}
+  ```
+- **深度剖析**：`qwen2.5-coder:1.5b` 默认上下文窗口（Context Window）长达 **32,768 (32k)**。在初始化 32k 的 KV Cache 缓冲区时，Ollama 必须瞬间分配数 GB 连续物理内存。在可用物理内存吃紧（~500MB - 1GB）的普通 PC 上，llama-runner 进程会因内存不足直接崩溃（panic）。
+- **解决方案**：在 `OpenAIServerModel` 初始化时，通过 `extra_body` 参数向 Ollama 传递底层裁剪参数：
+  ```python
+  model = OpenAIServerModel(
+      model_id="qwen2.5-coder:1.5b",
+      api_base="http://127.0.0.1:11434/v1",
+      api_key="ollama",
+      # 限制上下文为 4096，内存占用由数 GB 骤降至 ~300MB，彻底告别 500 崩溃
+      extra_body={"options": {"num_ctx": 4096, "num_batch": 256}},
+  )
+  ```
+
+#### 坑 2：Windows 控制台 GBK 乱码与 `UnicodeEncodeError`
+- **异常现象**：DuckDuckGo 搜索国际科技动态时，返回内容包含泰文、日文或 Emoji，Windows 控制台抛出：
+  ```text
+  UnicodeEncodeError: 'gbk' codec can't encode character '\u0e17' in position 16: illegal multibyte sequence
+  ```
+- **解决方案**：在脚本首行强制重设标准输出流编码：
+  ```python
+  import sys
+  if sys.platform == "win32":
+      sys.stdout.reconfigure(encoding="utf-8")
+      sys.stderr.reconfigure(encoding="utf-8")
+  ```
+
+---
+
+### 3. 核心原理解析：CodeAgent 与 ToolCallingAgent 对比（小模型“单步抢跑”陷阱）
+
+将 1.5B 级别小模型投入智能体实战时，观察到了一个极具代表性的 Agent 运行现象：
+
+#### 🔴 现象：小模型的“假装执行 / 单步抢跑”
+在使用 `CodeAgent` 时，要求模型“搜索最新 AI 资讯并总结 3 条核心要点”，模型在 Step 1 输出了以下代码：
+```python
+news = web_search(query="top AI news")
+print(news[:5] + "...")
+final_answer("总结出 top AI news的 3 条核心新闻要点。")
+```
+最终直接返回：`Final answer: 总结出 top AI news的 3 条核心新闻要点。`
+
+#### 🧠 根因剖析：
+1. **生成代码阶段无法预知执行结果**：`CodeAgent` 的本质是让模型“写一段完整 Python 脚本”。在模型**生成代码的瞬间**，沙箱里的 `web_search()` 还根本没有向网络发送请求！变量 `news` 在这一刻对模型的大脑是完全未知的黑盒。
+2. **小模型规划定力不足**：70B 或商业顶级大模型懂得“第一步只写搜索语句，等待框架在下一步回填结果”；而 1.5B 级别小模型容易把 Prompt 中的所有要求（搜索 + 总结 + 调用 final_answer）试图在单个脚本里一次性全写完。
+3. **`final_answer` 立即短路退出**：一旦代码块中调用了 `final_answer`，智能体状态机便判定任务终结，模型再也没有机会进入 Step 2 去阅读真实的 `news` 内容。
+
+#### 🟢 解决之道：选用 `ToolCallingAgent`
+对于小模型，**`ToolCallingAgent`（函数调用型智能体）是更稳健的选择**：
+- **第 1 阶段（Action）**：模型仅输出结构化的工具调用请求 `web_search(query=...)`。
+- **中间层（Observation）**：框架执行工具，将抓取回来的真实新闻内容注入回模型的上下文（Observations）。
+- **第 2 阶段（Thought & Answer）**：模型在提示词中切切实实看到了搜索回来的文字，在此基础上进行提炼并输出有深度的事实总结。
+
+| 对比维度 | `CodeAgent` | `ToolCallingAgent` |
+| :--- | :--- | :--- |
+| **动作形式** | 生成一段可执行的 Python 脚本 | 输出结构化的工具调用字典/JSON |
+| **核心优势** | 灵活性极高，支持单步复合变量计算与复杂逻辑 | 状态机严密，ReAct 思考-行动-观察阶段边界清晰 |
+| **适用模型** | 适合 7B/14B/32B 及以上具备较强规划能力的大模型 | **极度适合 1.5B/3B 等本地轻量级小模型** |
+| **防抢跑能力** | 依赖模型自觉分步，小模型极易提前调用 `final_answer` | 框架强制要求观察回填后再做下步决策，天然防抢跑 |
+
+---
+
 ## 📂 项目结构
 ```text
 agent-learn/
 ├── .env.example               # 环境变量配置模板
 ├── .gitignore                 # Git 忽略配置规则 (严格保护 .env 和 .venv)
-├── README.md                  # 学习日志与项目索引
+├── README.md                  # 学习日志与项目全局索引
+├── test.py                    # 模块三：本地开源模型 (Ollama) 实战测试脚本
 └── chapter1/                  # 第一章：Unit 1 完整学习目录
+    ├── README.md              # Unit 1 深度教学与避坑指南 (本文件)
     ├── dummy_agent/           # 模块一：手搓基础智能体 (Dummy Agent)
     │   └── DummyAgentLibrary.py   # 单文件独立实现：ReAct 机制完整对比实验
     └── First_agent_template/  # 模块二：官方课程智能体 (Space 完整复刻与拓展)
@@ -130,7 +215,7 @@ agent-learn/
    pip install -r chapter1/First_agent_template/requirements.txt
    ```
 2. **配置密钥**：
-   在项目根目录 `.env` 中填入你的智谱 API Key：
+   在项目根目录 `.env` 中填入你的智谱 API Key（若仅跑本地模型则无需配置）：
    ```bash
    ZHIPUAI_API_KEY="your_api_key_here"
    ```
@@ -147,3 +232,9 @@ agent-learn/
      ```bash
      python .\chapter1\First_agent_template\app.py
      ```
+   - **模块三：本地开源小模型（Ollama 免审查实战）**：
+     ```bash
+     # 确保 ollama 服务已启动且已下载模型 (ollama run qwen2.5-coder:1.5b)
+     python test.py
+     ```
+
