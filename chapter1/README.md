@@ -1,9 +1,13 @@
 # 📖 Unit 1: 智能体基础与初识工具 (Dummy Agent & First Agent Template)
 
 本目录为 Hugging Face 官方课程 **Unit 1** 的全部实践与原理解析，包含三个逐步递进的模块：
+本目录为 Hugging Face 官方课程 **Unit 1** 的全部实践与原理解析，包含四个逐步递进的模块：
 1. **`dummy_agent/`**：手搓白盒 ReAct 智能体（理解 Stop 截断、思维链与工具闭环）；
 2. **`First_agent_template/`**：工业级框架 `smolagents` 官方模板克隆、修复与 7 大工具拓展实战；
 3. **`test.py` (本地开源模型进阶)**：本地 Ollama 小模型落地、硬件内存压榨调优与 CodeAgent vs ToolCallingAgent 范式深度对比。
+2. **`Decoding/`**：底层机制探秘（大模型如何逐词决策？Greedy 与 Beam Search 树状可视化拆解）；
+3. **`First_agent_template/`**：工业级框架 `smolagents` 官方模板克隆、修复与 7 大工具拓展实战；
+4. **`test.py` (本地开源模型进阶)**：本地 Ollama 小模型落地、硬件内存压榨调优与 CodeAgent vs ToolCallingAgent 范式深度对比。
 
 ---
 
@@ -87,12 +91,16 @@ flowchart LR
 | 工具名称 | 对应模块 | 功能特性 |
 | :--- | :--- | :--- |
 | `final_answer` | `tools/final_answer.py` | 官方终结输出工具，总结最终结论 |
+| `search_news` | `app.py` | 📰 专门检索最新实时新闻、科技动态与时事热点（带智能回退） |
 | `get_current_time_in_timezone` | `app.py` | 全球主要城市（北京/巴黎/伦敦/东京等）时区映射与本地时间查询 |
 | `get_weather` | `app.py` | 城市实时天气与体感状态查询 |
+| `get_weather` | `app.py` | 全球城市与国家实时天气与体感状态查询 (基于 wttr.in) |
 | `calculator` | `app.py` | 安全执行高精度数学与科学计算（三角函数/指数/开方） |
 | `web_search` | `tools/web_search.py` | 激活 DuckDuckGo 公网实时多源信息搜索 |
+| `web_search` | `tools/web_search.py` | 激活 DuckDuckGo 公网实时多源信息搜索（兼容字符串与列表） |
 | `visit_webpage` | `tools/visit_webpage.py` | 抓取公网 URL 内容并自动转换为 Markdown 文本供智能体阅读 |
 | `my_custom_tool` | `app.py` | 文本多维度结构分析（字符数/词数/行数统计） |
+
 
 ---
 
@@ -189,7 +197,17 @@ agent-learn/
     ├── README.md              # Unit 1 深度教学与避坑指南 (本文件)
     ├── dummy_agent/           # 模块一：手搓基础智能体 (Dummy Agent)
     │   └── DummyAgentLibrary.py   # 单文件独立实现：ReAct 机制完整对比实验
-    └── First_agent_template/  # 模块二：官方课程智能体 (Space 完整复刻与拓展)
+    ├── Decoding/              # 模块二：大模型解码策略探秘 (Decoding & Beam Search 可视化)
+    │   ├── DAILY_LOG.md       # 今日精简工程日志（做了什么）
+    │   ├── README.md          # 解码策略核心教学与学习总结（学了什么）
+    │   ├── test1.py           # 贪婪搜索测试 (Greedy Search)
+    │   ├── test2.py           # 束搜索测试 (Beam Search: beams=2)
+    │   ├── test3.py           # 多候选束搜索测试 (Beam Search: beams=4, return=3)
+    │   ├── visualize_helper.py# HTML 决策树渲染生成器
+    │   ├── test1_greedy.html  # 贪婪搜索决策树独立网页
+    │   ├── test2_beam_search_b2.html # 2束搜索决策树独立网页
+    │   └── test3_beam_search_b4.html # 4束搜索决策树独立网页
+    └── First_agent_template/  # 模块三：官方课程智能体 (Space 完整复刻与拓展)
         ├── .gitattributes     # 官方 Git LFS 配置
         ├── agent.json         # 智能体元数据描述
         ├── app.py             # 主程序入口 (支持 Gradio Web UI 与 --cli 模式)
