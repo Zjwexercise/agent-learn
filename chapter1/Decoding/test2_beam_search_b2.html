@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试 2：束搜索 (Beam Search: beams=2) 解码过程</title>
+    <style>
+        :root {
+            --body-text-color: #1e293b;
+            --primary-500: #bae6fd;
+            --primary-400: #7dd3fc;
+            --secondary-500: #86efac;
+            --border-color: #cbd5e1;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f1f5f9;
+            color: var(--body-text-color);
+            padding: 30px;
+            margin: 0;
+        }
+        .header {
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #0f172a;
+            font-size: 26px;
+            margin-bottom: 6px;
+        }
+        .subtitle {
+            color: #64748b;
+            font-size: 14px;
+        }
+        .summary-box {
+            background: #ffffff;
+            border-left: 5px solid #0284c7;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .summary-title {
+            font-weight: 700;
+            color: #0369a1;
+            margin-bottom: 6px;
+        }
+        .tree-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 24px;
+            overflow-x: auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        /* Hugging Face Tree Styles */
+        .custom-container {
+            display: inline-block;
+            min-width: 100%;
+        }
+        .tree {
+            display: inline-block;
+            font-size: 12px;
+            white-space: nowrap;
+            padding: 10px;
+        }
+        .tree ul {
+            padding-left: 28px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin: 0;
+            list-style-type: none;
+        }
+        .tree li {
+            display: flex;
+            align-items: center;
+            position: relative;
+            padding-left: 20px;
+        }
+        .tree li::before, .tree li::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            border-left: 2px solid #94a3b8;
+            width: 20px;
+        }
+        .tree li::before {
+            top: 0;
+            height: 50%;
+        }
+        .tree li::after {
+            top: 50%;
+            height: 50%;
+            border-top: 2px solid #94a3b8;
+        }
+        .tree li:only-child::after, .tree li:only-child::before {
+            display: none;
+        }
+        .tree li:first-child::before, .tree li:last-child::after {
+            border: 0 none;
+        }
+        .tree li:last-child::before {
+            border-bottom: 2px solid #94a3b8;
+            border-radius: 0 0 0 6px;
+        }
+        .tree li:first-child::after {
+            border-radius: 6px 0 0 0;
+        }
+        .tree ul ul::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            border-top: 2px solid #94a3b8;
+            width: 20px;
+        }
+        .tree li a {
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            border-radius: 6px;
+            padding: 8px 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: inherit;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            transition: all 0.2s ease;
+        }
+        .tree li a:hover {
+            border-color: #0284c7;
+            box-shadow: 0 2px 8px rgba(2,132,199,0.15);
+        }
+        .tree li a span {
+            font-weight: 600;
+            font-size: 13px;
+        }
+        table {
+            border-collapse: collapse;
+            font-size: 12px;
+            margin: 0;
+        }
+        th, td {
+            padding: 4px 8px;
+            text-align: left;
+            border: 1px solid #e2e8f0;
+        }
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #475569;
+        }
+        .chosen-token {
+            background-color: #bae6fd !important;
+            font-weight: bold;
+            color: #0369a1 !important;
+        }
+        .selected-sequence {
+            background-color: #86efac !important;
+            border: 2px solid #16a34a !important;
+            font-weight: bold;
+            color: #14532d;
+        }
+        .nonselected-sequence {
+            background-color: #e2e8f0 !important;
+            color: #64748b;
+        }
+        .end-of-text {
+            font-weight: bold;
+        }
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            border: 1px solid #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 测试 2：束搜索 (Beam Search: beams=2) 解码过程</h1>
+        <div class="subtitle">Hugging Face Agents Course 第一章：LLM 生成解码策略（Decoding Strategy）可视化</div>
+    </div>
+
+    <div class="summary-box">
+        <div class="summary-title">📌 解码说明与最终生成序列：</div>
+        <div>The conclusive sequences are the ones that end in an <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'><|endoftext|></code> token or at the end of generation.<br><br>They are ranked by their scores, as given by the formula <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'>score = cumulative_score / (output_length ** length_penalty)</code>.<br><br>Only the top <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'>num_beams</code> scoring sequences are returned: in the tree they are highlighted in **<span style='color:var(--secondary-500)!important'>blue</span>**. The non-selected sequences are also shown in the tree, highlighted in **<span style='color:var(--primary-500)!important'>yellow</span>**.<br>#### <span style='color:var(--secondary-500)!important'>Output sequences:</span><br>- Score <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'>-1.62</code>: <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'>France's capital city is home to</code></div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item">
+            <span class="legend-color" style="background-color: #bae6fd;"></span>
+            <span><b>选中候选词 (Chosen Token)</b>：当前步得分最高并被选择的 Token</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color" style="background-color: #86efac; border: 2px solid #16a34a;"></span>
+            <span><b>最终胜出序列 (Selected Sequence)</b>：满足结束条件或束搜索总分最高路径</span>
+        </div>
+    </div>
+
+    <div class="tree-card">
+        <div class="custom-container">
+                            <div class="tree">
+            <ul> <li> <a id='root' class="nopadding"> <span> <b>France's capital city is</b> </span> 
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>the</td>
+        <td>-2.9341</td>
+        <td>-2.9341</td>
+    </tr>
+    <tr class=chosen-token>
+        <td>a</td>
+        <td>-2.9451</td>
+        <td>-2.9451</td>
+    </tr>
+    <tr class=chosen-token>
+        <td>now</td>
+        <td>-3.1686</td>
+        <td>-3.1686</td>
+    </tr>
+    <tr class=chosen-token>
+        <td>home</td>
+        <td>-3.2282</td>
+        <td>-3.2282</td>
+    </tr>
+</table> </a><ul> <li> <a class='nonfinal child'> <span> <b>the</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=>
+        <td>world</td>
+        <td>-2.7307</td>
+        <td>-2.8324</td>
+    </tr>
+    <tr class=>
+        <td>only</td>
+        <td>-2.9497</td>
+        <td>-2.9419</td>
+    </tr>
+    <tr class=>
+        <td>capital</td>
+        <td>-3.0066</td>
+        <td>-2.9703</td>
+    </tr>
+    <tr class=>
+        <td>first</td>
+        <td>-3.1029</td>
+        <td>-3.0185</td>
+    </tr>
+</table></a></li><li> <a class='nonfinal child'> <span> <b>a</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=>
+        <td>major</td>
+        <td>-3.4777</td>
+        <td>-3.2114</td>
+    </tr>
+    <tr class=>
+        <td>city</td>
+        <td>-3.5155</td>
+        <td>-3.2303</td>
+    </tr>
+    <tr class=>
+        <td>place</td>
+        <td>-3.7106</td>
+        <td>-3.3278</td>
+    </tr>
+    <tr class=>
+        <td>hot</td>
+        <td>-4.2343</td>
+        <td>-3.5897</td>
+    </tr>
+</table></a></li><li> <a class='nonfinal child'> <span> <b>now</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>home</td>
+        <td>-1.7686</td>
+        <td>-2.4686</td>
+    </tr>
+    <tr class=chosen-token>
+        <td>the</td>
+        <td>-2.3481</td>
+        <td>-2.7583</td>
+    </tr>
+    <tr class=chosen-token>
+        <td>a</td>
+        <td>-2.4844</td>
+        <td>-2.8265</td>
+    </tr>
+    <tr class=>
+        <td>one</td>
+        <td>-3.7243</td>
+        <td>-3.4464</td>
+    </tr>
+</table></a><ul> <li> <a class='end-of-text child nonselected-sequence'> <span> <b>home</b> <br>Total score: -2.47</span> </a> </li><li> <a class='end-of-text child nonselected-sequence'> <span> <b>the</b> <br>Total score: -2.76</span> </a> </li><li> <a class='end-of-text child nonselected-sequence'> <span> <b>a</b> <br>Total score: -2.83</span> </a> </li></ul></li><li> <a class='nonfinal child'> <span> <b>home</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>to</td>
+        <td>-0.0058</td>
+        <td>-1.6170</td>
+    </tr>
+    <tr class=>
+        <td>of</td>
+        <td>-6.4077</td>
+        <td>-4.8180</td>
+    </tr>
+    <tr class=>
+        <td>,</td>
+        <td>-7.1992</td>
+        <td>-5.2137</td>
+    </tr>
+    <tr class=>
+        <td>.</td>
+        <td>-7.2311</td>
+        <td>-5.2296</td>
+    </tr>
+</table></a><ul> <li> <a class='end-of-text child selected-sequence'> <span> <b>to</b> <br>Total score: -1.62</span> </a> </li></ul></li></ul>
+    </li> </ul>
+    </div>
+</body>
+    </div>
+</body>
+</html>

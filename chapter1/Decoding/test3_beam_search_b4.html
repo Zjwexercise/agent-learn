@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试 3：束搜索 (Beam Search: beams=4, return=3) 多序列生成过程</title>
+    <style>
+        :root {
+            --body-text-color: #1e293b;
+            --primary-500: #bae6fd;
+            --primary-400: #7dd3fc;
+            --secondary-500: #86efac;
+            --border-color: #cbd5e1;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f1f5f9;
+            color: var(--body-text-color);
+            padding: 30px;
+            margin: 0;
+        }
+        .header {
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #0f172a;
+            font-size: 26px;
+            margin-bottom: 6px;
+        }
+        .subtitle {
+            color: #64748b;
+            font-size: 14px;
+        }
+        .summary-box {
+            background: #ffffff;
+            border-left: 5px solid #0284c7;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .summary-title {
+            font-weight: 700;
+            color: #0369a1;
+            margin-bottom: 6px;
+        }
+        .tree-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 24px;
+            overflow-x: auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        /* Hugging Face Tree Styles */
+        .custom-container {
+            display: inline-block;
+            min-width: 100%;
+        }
+        .tree {
+            display: inline-block;
+            font-size: 12px;
+            white-space: nowrap;
+            padding: 10px;
+        }
+        .tree ul {
+            padding-left: 28px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin: 0;
+            list-style-type: none;
+        }
+        .tree li {
+            display: flex;
+            align-items: center;
+            position: relative;
+            padding-left: 20px;
+        }
+        .tree li::before, .tree li::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            border-left: 2px solid #94a3b8;
+            width: 20px;
+        }
+        .tree li::before {
+            top: 0;
+            height: 50%;
+        }
+        .tree li::after {
+            top: 50%;
+            height: 50%;
+            border-top: 2px solid #94a3b8;
+        }
+        .tree li:only-child::after, .tree li:only-child::before {
+            display: none;
+        }
+        .tree li:first-child::before, .tree li:last-child::after {
+            border: 0 none;
+        }
+        .tree li:last-child::before {
+            border-bottom: 2px solid #94a3b8;
+            border-radius: 0 0 0 6px;
+        }
+        .tree li:first-child::after {
+            border-radius: 6px 0 0 0;
+        }
+        .tree ul ul::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            border-top: 2px solid #94a3b8;
+            width: 20px;
+        }
+        .tree li a {
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            border-radius: 6px;
+            padding: 8px 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: inherit;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            transition: all 0.2s ease;
+        }
+        .tree li a:hover {
+            border-color: #0284c7;
+            box-shadow: 0 2px 8px rgba(2,132,199,0.15);
+        }
+        .tree li a span {
+            font-weight: 600;
+            font-size: 13px;
+        }
+        table {
+            border-collapse: collapse;
+            font-size: 12px;
+            margin: 0;
+        }
+        th, td {
+            padding: 4px 8px;
+            text-align: left;
+            border: 1px solid #e2e8f0;
+        }
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #475569;
+        }
+        .chosen-token {
+            background-color: #bae6fd !important;
+            font-weight: bold;
+            color: #0369a1 !important;
+        }
+        .selected-sequence {
+            background-color: #86efac !important;
+            border: 2px solid #16a34a !important;
+            font-weight: bold;
+            color: #14532d;
+        }
+        .nonselected-sequence {
+            background-color: #e2e8f0 !important;
+            color: #64748b;
+        }
+        .end-of-text {
+            font-weight: bold;
+        }
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            border: 1px solid #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 测试 3：束搜索 (Beam Search: beams=4, return=3) 多序列生成过程</h1>
+        <div class="subtitle">Hugging Face Agents Course 第一章：LLM 生成解码策略（Decoding Strategy）可视化</div>
+    </div>
+
+    <div class="summary-box">
+        <div class="summary-title">📌 解码说明与最终生成序列：</div>
+        <div>The conclusive sequences are the ones that end in an <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'><|endoftext|></code> token or at the end of generation.<br><br>They are ranked by their scores, as given by the formula <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'>score = cumulative_score / (output_length ** length_penalty)</code>.<br><br>Only the top <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'>num_beams</code> scoring sequences are returned: in the tree they are highlighted in **<span style='color:var(--secondary-500)!important'>blue</span>**. The non-selected sequences are also shown in the tree, highlighted in **<span style='color:var(--primary-500)!important'>yellow</span>**.<br>#### <span style='color:var(--secondary-500)!important'>Output sequences:</span><br>- Score <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'>-1.14</code>: <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'>Conclusion: thanks a lot. That's all for today.\n\nAdvertisements<|endoftext|></code><br>- Score <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'>-1.30</code>: <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'>Conclusion: thanks a lot. That's all for today. I hope you enjoyed</code><br>- Score <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'>-1.33</code>: <code style='background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#d97706;'>Conclusion: thanks a lot. That's all for today. I'll be back</code></div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item">
+            <span class="legend-color" style="background-color: #bae6fd;"></span>
+            <span><b>选中候选词 (Chosen Token)</b>：当前步得分最高并被选择的 Token</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-color" style="background-color: #86efac; border: 2px solid #16a34a;"></span>
+            <span><b>最终胜出序列 (Selected Sequence)</b>：满足结束条件或束搜索总分最高路径</span>
+        </div>
+    </div>
+
+    <div class="tree-card">
+        <div class="custom-container">
+                            <div class="tree">
+            <ul> <li> <a id='root' class="nopadding"> <span> <b>Conclusion: thanks a lot. That's all for today</b> </span> 
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>.</td>
+        <td>-0.5978</td>
+        <td>-0.5978</td>
+    </tr>
+    <tr class=chosen-token>
+        <td>!</td>
+        <td>-2.0282</td>
+        <td>-2.0282</td>
+    </tr>
+    <tr class=chosen-token>
+        <td>,</td>
+        <td>-2.0387</td>
+        <td>-2.0387</td>
+    </tr>
+    <tr class=chosen-token>
+        <td>'s</td>
+        <td>-3.2158</td>
+        <td>-3.2158</td>
+    </tr>
+</table> </a><ul> <li> <a class='nonfinal child'> <span> <b>.</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>\n</td>
+        <td>-1.5149</td>
+        <td>-1.0563</td>
+    </tr>
+    <tr class=chosen-token>
+        <td>I</td>
+        <td>-2.4325</td>
+        <td>-1.5151</td>
+    </tr>
+    <tr class=chosen-token>
+        <td><|endoftext|></td>
+        <td>-3.3273</td>
+        <td>-1.9625</td>
+    </tr>
+    <tr class=chosen-token>
+        <td>We</td>
+        <td>-3.4864</td>
+        <td>-2.0421</td>
+    </tr>
+</table></a><ul> <li> <a class='nonfinal child'> <span> <b>\n</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>\n</td>
+        <td>-0.0059</td>
+        <td>-0.7062</td>
+    </tr>
+    <tr class=>
+        <td>I</td>
+        <td>-7.6405</td>
+        <td>-3.2511</td>
+    </tr>
+    <tr class=>
+        <td>The</td>
+        <td>-8.1795</td>
+        <td>-3.4307</td>
+    </tr>
+    <tr class=>
+        <td>Posted</td>
+        <td>-8.3080</td>
+        <td>-3.4736</td>
+    </tr>
+</table></a><ul> <li> <a class='nonfinal child'> <span> <b>\n</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>I</td>
+        <td>-3.5383</td>
+        <td>-1.4142</td>
+    </tr>
+    <tr class=chosen-token>
+        <td>Advertisements</td>
+        <td>-3.5755</td>
+        <td>-1.4235</td>
+    </tr>
+    <tr class=>
+        <td>The</td>
+        <td>-3.8763</td>
+        <td>-1.4987</td>
+    </tr>
+    <tr class=>
+        <td>If</td>
+        <td>-4.1248</td>
+        <td>-1.5609</td>
+    </tr>
+</table></a><ul> <li> <a class='nonfinal child'> <span> <b>I</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=>
+        <td>'m</td>
+        <td>-1.8223</td>
+        <td>-1.4958</td>
+    </tr>
+    <tr class=>
+        <td>hope</td>
+        <td>-2.3091</td>
+        <td>-1.5932</td>
+    </tr>
+    <tr class=>
+        <td>'ll</td>
+        <td>-2.5009</td>
+        <td>-1.6316</td>
+    </tr>
+    <tr class=>
+        <td>'ve</td>
+        <td>-2.5987</td>
+        <td>-1.6511</td>
+    </tr>
+</table></a></li><li> <a class='nonfinal child'> <span> <b>Advertisements</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td><|endoftext|></td>
+        <td>-0.0205</td>
+        <td>-1.1429</td>
+    </tr>
+    <tr class=>
+        <td>\n</td>
+        <td>-3.9276</td>
+        <td>-1.9243</td>
+    </tr>
+    <tr class=>
+        <td>\n\n</td>
+        <td>-8.7424</td>
+        <td>-2.8873</td>
+    </tr>
+    <tr class=>
+        <td>|</td>
+        <td>-9.6446</td>
+        <td>-3.0677</td>
+    </tr>
+</table></a><ul> <li> <a class='end-of-text child selected-sequence'> <span> <b><|endoftext|></b> <br>Total score: -1.14</span> </a> </li></ul></li></ul></li></ul></li><li> <a class='nonfinal child'> <span> <b>I</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>hope</td>
+        <td>-1.6229</td>
+        <td>-1.5510</td>
+    </tr>
+    <tr class=chosen-token>
+        <td>'ll</td>
+        <td>-1.6334</td>
+        <td>-1.5546</td>
+    </tr>
+    <tr class=>
+        <td>'m</td>
+        <td>-1.8231</td>
+        <td>-1.6178</td>
+    </tr>
+    <tr class=>
+        <td>'ve</td>
+        <td>-2.9061</td>
+        <td>-1.9788</td>
+    </tr>
+</table></a><ul> <li> <a class='nonfinal child'> <span> <b>hope</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>you</td>
+        <td>-0.4499</td>
+        <td>-1.2758</td>
+    </tr>
+    <tr class=>
+        <td>to</td>
+        <td>-2.8163</td>
+        <td>-1.8674</td>
+    </tr>
+    <tr class=>
+        <td>this</td>
+        <td>-3.0443</td>
+        <td>-1.9244</td>
+    </tr>
+    <tr class=>
+        <td>I</td>
+        <td>-3.0846</td>
+        <td>-1.9344</td>
+    </tr>
+</table></a><ul> <li> <a class='nonfinal child'> <span> <b>you</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>enjoyed</td>
+        <td>-1.3889</td>
+        <td>-1.2984</td>
+    </tr>
+    <tr class=chosen-token>
+        <td>enjoy</td>
+        <td>-1.6991</td>
+        <td>-1.3604</td>
+    </tr>
+    <tr class=>
+        <td>all</td>
+        <td>-2.7246</td>
+        <td>-1.5655</td>
+    </tr>
+    <tr class=>
+        <td>'ve</td>
+        <td>-2.7869</td>
+        <td>-1.5780</td>
+    </tr>
+</table></a><ul> <li> <a class='end-of-text child selected-sequence'> <span> <b>enjoyed</b> <br>Total score: -1.30</span> </a> </li><li> <a class='end-of-text child nonselected-sequence'> <span> <b>enjoy</b> <br>Total score: -1.36</span> </a> </li></ul></li></ul></li><li> <a class='nonfinal child'> <span> <b>'ll</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>be</td>
+        <td>-1.2528</td>
+        <td>-1.4791</td>
+    </tr>
+    <tr class=>
+        <td>see</td>
+        <td>-2.0987</td>
+        <td>-1.6906</td>
+    </tr>
+    <tr class=>
+        <td>get</td>
+        <td>-2.8543</td>
+        <td>-1.8795</td>
+    </tr>
+    <tr class=>
+        <td>try</td>
+        <td>-2.8710</td>
+        <td>-1.8837</td>
+    </tr>
+</table></a><ul> <li> <a class='nonfinal child'> <span> <b>be</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>back</td>
+        <td>-0.7355</td>
+        <td>-1.3304</td>
+    </tr>
+    <tr class=>
+        <td>posting</td>
+        <td>-3.5542</td>
+        <td>-1.8941</td>
+    </tr>
+    <tr class=>
+        <td>doing</td>
+        <td>-3.6644</td>
+        <td>-1.9162</td>
+    </tr>
+    <tr class=>
+        <td>sure</td>
+        <td>-4.0304</td>
+        <td>-1.9894</td>
+    </tr>
+</table></a><ul> <li> <a class='end-of-text child selected-sequence'> <span> <b>back</b> <br>Total score: -1.33</span> </a> </li></ul></li></ul></li></ul></li><li> <a class='end-of-text child nonselected-sequence'> <span> <b><|endoftext|></b> <br>Total score: -1.96</span> </a> </li><li> <a class='nonfinal child'> <span> <b>We</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=>
+        <td>'ll</td>
+        <td>-1.0861</td>
+        <td>-1.7234</td>
+    </tr>
+    <tr class=>
+        <td>'re</td>
+        <td>-1.8213</td>
+        <td>-1.9685</td>
+    </tr>
+    <tr class=>
+        <td>'ve</td>
+        <td>-2.6275</td>
+        <td>-2.2372</td>
+    </tr>
+    <tr class=>
+        <td>hope</td>
+        <td>-2.7148</td>
+        <td>-2.2663</td>
+    </tr>
+</table></a></li></ul></li><li> <a class='nonfinal child'> <span> <b>!</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>\n</td>
+        <td>-1.2470</td>
+        <td>-1.6376</td>
+    </tr>
+    <tr class=>
+        <td>I</td>
+        <td>-2.6319</td>
+        <td>-2.3300</td>
+    </tr>
+    <tr class=>
+        <td><|endoftext|></td>
+        <td>-2.7339</td>
+        <td>-2.3810</td>
+    </tr>
+    <tr class=>
+        <td>If</td>
+        <td>-3.5281</td>
+        <td>-2.7781</td>
+    </tr>
+</table></a><ul> <li> <a class='nonfinal child'> <span> <b>\n</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=chosen-token>
+        <td>\n</td>
+        <td>-0.0119</td>
+        <td>-1.0957</td>
+    </tr>
+    <tr class=>
+        <td>I</td>
+        <td>-7.0462</td>
+        <td>-3.4405</td>
+    </tr>
+    <tr class=>
+        <td><|endoftext|></td>
+        <td>-7.5241</td>
+        <td>-3.5998</td>
+    </tr>
+    <tr class=>
+        <td>Posted</td>
+        <td>-7.7064</td>
+        <td>-3.6605</td>
+    </tr>
+</table></a><ul> <li> <a class='nonfinal child'> <span> <b>\n</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=>
+        <td>Advertisements</td>
+        <td>-3.1356</td>
+        <td>-1.6057</td>
+    </tr>
+    <tr class=>
+        <td>I</td>
+        <td>-3.5203</td>
+        <td>-1.7018</td>
+    </tr>
+    <tr class=>
+        <td>If</td>
+        <td>-3.6928</td>
+        <td>-1.7450</td>
+    </tr>
+    <tr class=>
+        <td>The</td>
+        <td>-4.0306</td>
+        <td>-1.8294</td>
+    </tr>
+</table></a></li></ul></li></ul></li><li> <a class='nonfinal child'> <span> <b>,</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=>
+        <td>but</td>
+        <td>-2.1704</td>
+        <td>-2.1045</td>
+    </tr>
+    <tr class=>
+        <td>I</td>
+        <td>-2.1778</td>
+        <td>-2.1082</td>
+    </tr>
+    <tr class=>
+        <td>and</td>
+        <td>-2.6350</td>
+        <td>-2.3368</td>
+    </tr>
+    <tr class=>
+        <td>folks</td>
+        <td>-3.0042</td>
+        <td>-2.5214</td>
+    </tr>
+</table></a></li><li> <a class='nonfinal child'> <span> <b>'s</b> </span>
+<table>
+    <tr>
+        <th><b>Token</b></th>
+        <th><b>Step score</b></th>
+        <th><b>Total score</b></th>
+    </tr>
+    <tr class=>
+        <td>post</td>
+        <td>-1.4399</td>
+        <td>-2.3279</td>
+    </tr>
+    <tr class=>
+        <td>update</td>
+        <td>-2.7577</td>
+        <td>-2.9868</td>
+    </tr>
+    <tr class=>
+        <td>blog</td>
+        <td>-2.9609</td>
+        <td>-3.0884</td>
+    </tr>
+    <tr class=>
+        <td>episode</td>
+        <td>-3.3813</td>
+        <td>-3.2985</td>
+    </tr>
+</table></a></li></ul>
+    </li> </ul>
+    </div>
+</body>
+    </div>
+</body>
+</html>
