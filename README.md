@@ -16,11 +16,22 @@
 | 章节目录 | 课题内容 | 核心技术与产出 | 状态 |
 | :--- | :--- | :--- | :--- |
 | 📖 [**`chapter1/`**](chapter1/README.md) | **Unit 1: 智能体基础与工具初识** | 手搓白盒 ReAct 闭环、CodeAgent 范式、Space 模板工程化、7 大工具拓展及本地模型 (Ollama) 实战与排错 | ✅ 已完成 |
-| ⏳ **`chapter2/`** | **Unit 2: 框架深入与高级工具** | 后续进阶课程内容 | 📅 学习中... |
+| 📖 [**`chapter2/`**](chapter2/README.md) | **Unit 2: 知识检索与多智能体系统** | 开放网络检索与沙箱机制、BM25 本地知识库与切片陷阱修复、多智能体层级架构与工程化熔断、Multi-Agent + 私有 RAG 合体实战 | ✅ 已完成 |
 
 ---
 
 ## 📋 学习日志速览 (Daily Log / TL;DR)
+
+> **2026-09-19 学习纪要 (Unit 2: 知识检索、契约陷阱与多智能体系统)**
+> - **🎯 学习目标**：掌握检索增强智能体（Agentic RAG）与层级多智能体（Multi-Agent）系统原理，攻坚工具契约陷阱与多 Agent 调度。
+> - **🔨 核心攻坚**：
+>   1. **开放网络检索解剖**：复现 `DuckDuckGoSearchTool`，抓取 17 步死磕典型案例，剖析 Markdown 字符串误当字典访问导致的 `#` 号维基百科荒诞搜索与沙箱机制；
+>   2. **自定义 RAG 契约修复**：封装 LangChain BM25 检索工具，破解 `{'entertainment': 'R', 'catering': 't', 'decoration': 'e'}` 字符串切片静默失败 Bug，通过 `output_type="any"` 与原生 `list[str]` 彻底治愈；
+>   3. **多智能体层级调度加固**：拆解 `managed_agents` 调度机制，排查常规模型下 20 步超时与 12 步死循环（狂烧 20.4 万 Token），引入必应搜索、`max_steps` 熔断线与强提示词注入，实现 Token 骤降 92%；
+>   4. **架构终极跃迁**：构建独立 `multi_agent_step2_rag.py`，实现多智能体与企业私有 RAG 档案库合体，5.2 秒精准计算交付全球道具车回收航程报告。
+> - **➕ 结构重构**：
+>   - 建立 [`chapter2/notes/`](chapter2/notes/) 目录，将万字手记按四大模块独立拆解归档；
+>   - 将 [`chapter2/README.md`](chapter2/README.md) 重构为模块化导航中心与演进路线总览。
 
 > **2026-09-10 学习纪要 (本地模型攻坚与智能体范式对比)**
 > - **背景痛点**：突破云端商业模型安全审查与敏感词拦截限制，探索 100% 本地隐私与免审查智能体闭环。
@@ -66,16 +77,25 @@ agent-learn/
 ├── .gitignore                         # 严格过滤 .env 与 .venv
 ├── README.md                          # 仓库全局索引与速览日志
 ├── test.py                            # 本地开源模型 (Ollama) 实战测试脚本
-└── chapter1/                          # 📖 Unit 1 完整实践 (详见 chapter1/README.md)
-    ├── README.md                      # Unit 1 完整教程与详细原理解析
-    ├── dummy_agent/                   # 模块一：手搓基础智能体 (单文件独立运行)
-    │   └── DummyAgentLibrary.py
-    └── First_agent_template/          # 模块二：官方 Space 模板智能体 (多工具+Web UI)
-        ├── app.py
-        ├── Gradio_UI.py
-        ├── prompts.yaml
-        ├── requirements.txt
-        └── tools/
+├── chapter1/                          # 📖 Unit 1: 智能体基础与工具初识
+│   ├── README.md                      # Unit 1 完整教程与原理解析
+│   ├── dummy_agent/                   # 模块一：手搓基础智能体
+│   │   └── DummyAgentLibrary.py
+│   ├── First_agent_template/          # 模块二：官方 Space 模板智能体 (Web UI)
+│   └── Decoding/                      # 模块三：解码策略与可视化决策树探秘
+└── chapter2/                          # 📖 Unit 2: 知识检索与多智能体系统
+    ├── README.md                      # Unit 2 模块导航与演进路线总览
+    ├── notes/                         # 📚 深度原理解析与避坑手记
+    │   ├── 01_web_search_agent.md     # 模块一：开放网络检索与行为解剖
+    │   ├── 02_custom_rag_tool.md      # 模块二：私有知识库与契约陷阱
+    │   ├── 03_multi_agent_system.md   # 模块三：多智能体协作与层级调度
+    │   └── 04_multi_agent_rag.md      # 模块四：多智能体与私有 RAG 合体
+    ├── rag_step1_web.py               # 步骤 1：开放网络搜索脚本
+    ├── rag_step2_custom_tool.py       # 步骤 2：官方 BM25 检索脚本 (暴露切片Bug)
+    ├── rag_step2_fixed.py             # 步骤 3：修复版 BM25 检索脚本 (结构化输出)
+    ├── multi_agent_step1.py           # 步骤 4：官方多智能体协作脚本 (暴露超时/死循环)
+    ├── multi_agent_step1_fixed.py     # 步骤 5：加固版多智能体脚本 (必应+熔断)
+    └── multi_agent_step2_rag.py       # 步骤 6：终极多智能体+私有RAG脚本
 ```
 
 ---
