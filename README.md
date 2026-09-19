@@ -17,6 +17,7 @@
 | :--- | :--- | :--- | :--- |
 | 📖 [**`chapter1/`**](chapter1/README.md) | **Unit 1: 智能体基础与工具初识** | 手搓白盒 ReAct 闭环、CodeAgent 范式、Space 模板工程化、7 大工具拓展及本地模型 (Ollama) 实战与排错 | ✅ 已完成 |
 | ⏳ **`chapter2/`** | **Unit 2: 框架深入与高级工具** | 后续进阶课程内容 | 📅 学习中... |
+| 📖 [**`chapter2/`**](chapter2/README.md) | **Unit 2: 知识检索与多智能体系统** | 开放网络检索与沙箱机制、BM25 本地知识库与切片陷阱修复、多智能体层级架构与工程化熔断、Multi-Agent + 私有 RAG 合体实战 | ✅ 已完成 |
 | 📖 [**`chapter2/`**](chapter2/README.md) | **Unit 2: 知识检索、多模态视觉与多智能体系统** | 开放检索与沙箱机制、BM25 本地知识库契约修复、多智能体层级架构与熔断、Multi-Agent + 私有 RAG、多模态静态视觉核验 | ✅ 已完成 |
 
 ---
@@ -27,6 +28,9 @@
 > - **🎯 目标**：突破纯文本边界，实现具备图像理解与逻辑推理的静态视觉智能体。
 > - **🔨 实践**：编写 [`vision_step1_static.py`](chapter2/vision_step1_static.py)，实现阿福门禁监控抓拍 5 秒识破小丑冒充神奇女侠。
 > - **💡 核心攻坚**：理清“VLM 内生视觉 vs 外挂 Tool”边界，解密 smolagents 自动 Base64 序列化与 `TaskStep` 记忆中枢，攻克 `flatten_messages_as_text=True` 断言崩溃。
+> **2026-09-20 学习纪要 (Unit 2: 视觉多模态智能体)**
+> 编写 `vision_step1_static.py` 完成静态视觉核验实战。搞清楚了 VLM 内生视力与外挂 Tool 的区别（tools 传空亦可识图），理顺了 smolagents 底层 Base64 编码与 TaskStep 记忆中枢的作用，排查了多模态下 `flatten_messages_as_text=True` 导致的断言崩溃及代码格式引导。
+
 
 > **2026-09-19 学习纪要 (Unit 2: 知识检索、契约陷阱与多智能体系统)**
 > - **🎯 学习目标**：掌握检索增强智能体（Agentic RAG）与层级多智能体（Multi-Agent）系统原理，攻坚工具契约陷阱与多 Agent 调度。
