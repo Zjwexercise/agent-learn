@@ -1,8 +1,8 @@
-# 📖 Unit 2: 知识检索与检索增强型智能体 (Retrieval Agents / Agentic RAG)
+# 📖 Unit 2: 知识检索、多模态视觉与多智能体系统
 
 本目录为 Hugging Face 官方课程 **Unit 2** 的代码实践、避坑分析与架构演进记录。
 
-重点探索：**当大模型面对海量开放网络信息或私有数据时，智能体如何自主规划检索、规避类型陷阱，并通过多智能体与 RAG（检索增强生成）协同完成高阶复杂任务**。
+重点探索：**当大模型面对海量开放网络、私有数据与视觉多模态信息时，智能体如何自主规划检索、规避类型陷阱、理解图像并协同完成高阶复杂任务**。
 
 ---
 
@@ -16,6 +16,7 @@
 | **模块二** | 📄 [**专属本地知识库构建与契约陷阱**](notes/02_custom_rag_tool.md) | [`rag_step2_custom_tool.py`](rag_step2_custom_tool.py)<br>[`rag_step2_fixed.py`](rag_step2_fixed.py) | BM25 检索工具封装；破解 `{'entertainment': 'R', 't', 'e'}` 字符串切片静默 Bug；规范 `list[str]` 契约 |
 | **模块三** | 📄 [**多智能体协作系统与层级调度**](notes/03_multi_agent_system.md) | [`multi_agent_step1.py`](multi_agent_step1.py)<br>[`multi_agent_step1_fixed.py`](multi_agent_step1_fixed.py) | 揭示轻量模型在官方代码下的“车祸现场”；换用必应稳定搜索、焊死 `max_steps` 熔断线、强提示词注入 |
 | **模块四** | 📄 [**终极架构：多智能体与私有 RAG 合体**](notes/04_multi_agent_rag.md) | [`multi_agent_step2_rag.py`](multi_agent_step2_rag.py) | 解决网络搜索噪声大痛点；构建企业级《蝙蝠侠》私有取景档案库；下属秒查坐标，经理秒算航程 |
+| **模块五** | 📄 [**静态视觉智能体与多模态身份核验**](notes/05_vision_agent_static.md) | [`vision_step1_static.py`](vision_step1_static.py) | 接入 `glm-4v-flash` 多模态底座；解剖 Base64 图像编码与断言陷阱；阿福门禁监控 5 秒识破小丑伪装 |
 
 ---
 
@@ -41,6 +42,9 @@ python chapter2/multi_agent_step1_fixed.py
 
 # 6. 运行终极合体版：多智能体 + 私有 RAG 档案库（5 秒精准交付决策）
 python chapter2/multi_agent_step2_rag.py
+
+# 7. 运行静态视觉智能体：多模态识图与伪装身份辨识（5 秒完成门禁鉴真）
+python chapter2/vision_step1_static.py
 ```
 
 ---
@@ -54,7 +58,8 @@ python chapter2/multi_agent_step2_rag.py
 | **阶段 3：结构化契约修复** | [`rag_step2_fixed.py`](rag_step2_fixed.py) | `output_type="any"` 返回 `list[str]` | 2 步利落完成，输出完整段落内容，彻底根治单字 Bug |
 | **阶段 4：原生多智能体** | [`multi_agent_step1.py`](multi_agent_step1.py) | `managed_agents` 层级调度 | 官方作者靠顶级模型掩盖缺陷；小模型下属打满20步，经理连续print死循环12次 |
 | **阶段 5：工程化加固** | [`multi_agent_step1_fixed.py`](multi_agent_step1_fixed.py) | Bing 搜索 + `max_steps` 熔断 + 强约束提示 | 阻断死循环，自愈容错，Token 消耗暴降 92% |
-| **阶段 6：终极合体** | [`multi_agent_step2_rag.py`](multi_agent_step2_rag.py) | **Multi-Agent + 私有 RAG 档案库** | 下属 5 秒精准命中档案坐标，经理秒算航程呈送阿福，架构彻底稳健！ |
+| **阶段 6：多智能体+私有RAG**| [`multi_agent_step2_rag.py`](multi_agent_step2_rag.py) | **Multi-Agent + 私有 RAG 档案库** | 下属 5 秒精准命中档案坐标，经理秒算航程呈送阿福，架构彻底稳健！ |
+| **阶段 7：多模态视觉智能体**| [`vision_step1_static.py`](vision_step1_static.py) | **VLM 静态视觉推理 (`glm-4v-flash`)** | 接收 PIL 抓拍图片，1 步提取绿发红唇等特征，精准识破小丑冒充神奇女侠！ |
 
 ---
 
@@ -63,3 +68,4 @@ python chapter2/multi_agent_step2_rag.py
 1. **给 CodeAgent 写的工具必须“言行一致”**：能返回列表/字典等原生对象就绝不返回假装成列表的长字符串。
 2. **所有生产 Agent 必须焊死熔断器**：严格配置 `max_steps`，防止模型在沙箱中死循环并疯狂消耗 Token。
 3. **私有 RAG 优于嘈杂 Web**：对于关键业务与精准参数（如经纬度、配置项），通过切块与索引接入私有知识库，效率与稳定性远超开放搜索引擎。
+4. **多模态视觉切勿开启文本展平**：调用 VLM 处理图像时，切勿配置 `flatten_messages_as_text=True`，否则将导致框架无法打包 Base64 图片而直接断言崩溃。
